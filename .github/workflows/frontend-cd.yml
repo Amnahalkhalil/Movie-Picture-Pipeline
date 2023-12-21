@@ -84,7 +84,7 @@ jobs:
       run: |
         cd starter/frontend
         docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:latest .
-        docker push ${{ secrets.ECR_REGISTRY }}:frontend
+        docker push ${{ secrets.ECR_REGISTRY }}:latest
 
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
