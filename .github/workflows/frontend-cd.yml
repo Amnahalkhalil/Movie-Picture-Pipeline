@@ -80,17 +80,28 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v2
       # with:
       #   mask-password: 'false'
-
     - name: Build and push Docker image
       run: |
         cd starter/frontend
-        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}/frontend:latest .
-        docker push ${{ secrets.ECR_REGISTRY }}/frontend:latest
+    
+        # Ensure REACT_APP_MOVIE_API_URL is defined
+        if [ -z "${REACT_APP_MOVIE_API_URL}" ]; then
+          echo "REACT_APP_MOVIE_API_URL is not set. Exiting."
+          exit 1
+        fi
+    
+        # Build the Docker image with the correct tag format
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=${REACT_APP_MOVIE_API_URL} --tag your-registry-url/frontend:latest .
+        
+        # Push the image to the registry
+        docker push your-registry-url/frontend:latest
       env:
         AWS_DEFAULT_REGION: us-east-1
         AWS_REGION: us-east-1
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        REACT_APP_MOVIE_API_URL: http://localhost:5000  # Set this to your desired URL
+    
     
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --region us-east-1 --name udacityproject4-cluster
