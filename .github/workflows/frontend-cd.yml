@@ -1,119 +1,96 @@
-name: Frontend Continuous Deployment
+name: frontend-cd
 
 on:
   workflow_dispatch:
   push:
-   branches:
+    branches:
       - main
 
 jobs:
-  lint:
-    name: Lint
+  linting:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - name: Checking Out the code from Repo
-        uses: actions/checkout@v3
-  
-      - name: Setting up NodeJS
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16.16.0
-  
-      - name: Cache before dependency install
-        id: CachingData
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-        
-      - name: Installing dependencies
-        run: npm ci
-  
-      - name: Now Running Lint
-        run: npm run lint
-  
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    defaults:
-        run:
-          working-directory: frontend
-    steps:
-      - name: Checking Out the code from Repo
-        uses: actions/checkout@v3
-      
-      - name: Setting up NodeJS
-        uses: actions/setup-node@v3
-        with:
-            node-version: 16.16.0
-      
-      - name: Cache before dependency install
-        id: CachingData
-        uses: actions/cache@v3
-        with:
-            path: ~/.npm
-            key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-          
-      - name: Installing dependencies
-        run: npm ci
-      
-      - name: Now Running Tests
-        run: npm run test
-      
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [lint,test]
-    defaults:
-        run:
-          working-directory: frontend
-    steps:
-      - name: Checking Out the code from Repo
-        uses: actions/checkout@v3
-  
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-          
-  
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-  
-      - name: Build, tag, and push docker image to Amazon ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: frontend
-          IMAGE_TAG: ${{ github.sha }}
-          REACT_APP_MOVIE_API_URL: ${{ vars.REACT_APP_MOVIE_API_URL }}
-        run: |
-          docker build --build-arg=REACT_APP_MOVIE_API_URL="http://$REACT_APP_MOVIE_API_URL" -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-      
-      - name: Setup Authentication against EKS Cluster 
-        run: |
-          aws eks update-kubeconfig --name cluster --region us-east-1
-          kubectl get svc
-          kubectl config view
 
-      - name: Run init.sh
-        run:  |
-          chmod +x init.sh 
-          ./init.sh || true
-          kubectl config view
-        working-directory: setup
-          
-      - name: Deploy the image to the cluster
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          cd k8s
-          kustomize edit set image frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: starter/frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: starter/frontend
+      run: npm ci
+
+    - name: Checkout run lint
+      run: cd starter/frontend && npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: starter/frontend/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: starter/frontend
+      run: npm ci
+  
+    - name: Test
+      run: cd starter/frontend && npm run test
+
+
+
+  build:
+    needs: [linting, test]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: starter/frontend/package-lock.json
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+        aws-region: us-east-1
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      # with:
+      #   mask-password: 'false'
+
+    - name: build and push docker image
+      run: |
+        cd starter/frontend
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:frontend .
+        docker push ${{ secrets.ECR_REGISTRY }}:frontend
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
+
+    - name: Deploy Docker Image to Amazon EKS using kubectl
+      working-directory: starter/frontend/k8s
+      run: |
+          kustomize edit set image frontend=${{ secrets.ECR_REGISTRY }}:frontend
           kustomize build | kubectl apply -f -
-      
