@@ -83,7 +83,7 @@ jobs:
     - name: build and push docker image
       run: |
         cd starter/frontend
-        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:frontend .
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:latest .
         docker push ${{ secrets.ECR_REGISTRY }}:frontend
 
     - name: Update kubeconfig
