@@ -47,10 +47,10 @@ jobs:
           region: us-east-1
 
       - name: Tag Docker Image
-        run: docker tag backend:latest 151911597338.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+        run: docker tag backend:latest 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
       - name: Push Docker image to ECR
-        run: docker push 151911597338.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+        run: docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
       - name: Setup Kubectl
         uses: azure/setup-kubectl@v1
