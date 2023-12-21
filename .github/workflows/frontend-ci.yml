@@ -1,102 +1,72 @@
-name: 'Frontend Continuous Integration'
+name: continuous-integration-frontend
 on:
   workflow_dispatch:
-
   pull_request:
     branches:
-      - main
+        - main
+    paths:
+      - 'starter/frontend/**'
+
+env:
+  NODE_VERSION: '18.x'
 
 jobs:
-  # lint
-  lint-job:
-    name: Linting
-    runs-on: ubuntu-latest 
-
-    steps:
-      - name: checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup nodejs
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14
-
-      - name: Cache dependencies
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Install dependencies
-        run: cd ./starter/frontend && npm install
-
-      - name: Install prettier
-        run: |
-          cd ./starter/frontend 
-          npm install prettier@2.8.8 --save-dev
-
-      - name: Run lint check
-        run: cd ./starter/frontend && npm run lint
-  # test
-  test-job:
-    name: Testing job
+  lint:
     runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: starter/frontend
 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Setup nodejs
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14
+    - name: Use Node.js 
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{env.NODE_VERSION}}
+        cache: 'npm'
+        cache-dependency-path: "starter/frontend/package-lock.json"
+        
+    - name: Lint
+      run: | 
+        npm ci
+        npm run lint
 
-      - name: Cache dependencies
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: starter/frontend
 
-      - name: Install dependencies
-        run: cd ./starter/frontend && npm install
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Run test
-        run: cd ./starter/frontend && npm run test
-  # build
+    - name: Use Node.js 
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{env.NODE_VERSION}}
+        cache: 'npm'
+        cache-dependency-path: "starter/frontend/package-lock.json"
+        
+    - name: Test
+      run: | 
+        npm ci
+        npm run test 
+
   build:
-    needs: [lint-job, test-job]
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: starter/frontend
+    needs:
+      - lint
+      - test 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Setup nodejs
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14
-      
-      - name: Cache dependencies
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Install prettier
-        run: |
-          cd ./starter/frontend 
-          npm install prettier@2.8.8 --save-dev
-
-      - name: Install dependencies
-        run: cd ./starter/frontend && npm install
-
-      - name: Run test
-        run: cd ./starter/frontend && npm run test
-      
-      - name: Build Docker Image
-        run: |
-          cd ./starter/frontend
-          docker build -t frontend .
+    - name: Build docker image
+      run: |
+        docker build -t frontend .

@@ -1,81 +1,93 @@
-name: 'Frontend Continuous Deployment'
+name: continuous-deployment-frontend
 on:
   workflow_dispatch:
-
-  pull_request:
+  push:
     branches:
-      - main
+        - main
+    paths:
+      - 'starter/frontend/**'
+    
+env:
+  NODE_VERSION: '18.x'
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: starter/frontend
 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Setup nodejs
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14
+    - name: Use Node.js 
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{env.NODE_VERSION}}
+        cache: 'npm'
+        cache-dependency-path: "starter/frontend/package-lock.json"
+        
+    - name: Lint
+      run: | 
+        npm ci
+        npm run lint
 
-      - name: Restore dependencies
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: starter/frontend
 
-      - name: Install dependencies
-        run: cd ./starter/frontend && npm install
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Install prettier
-        run: |
-          cd ./starter/frontend 
-          npm install prettier@2.8.8 --save-dev
+    - name: Use Node.js 
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{env.NODE_VERSION}}
+        cache: 'npm'
+        cache-dependency-path: "starter/frontend/package-lock.json"
+        
+    - name: Test
+      run: | 
+        npm ci
+        npm run test 
 
-      - name: Run lint check
-        run: cd ./starter/frontend && npm run lint
+  deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - test 
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Run test
-        run: cd ./starter/frontend && npm run test
-      
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
 
-      - name: ECR Login
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          region: us-east-1
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
-        run: |
-          cd ./starter/frontend
-          docker build -t frontend --build-arg=REACT_APP_MOVIE_API_URL=${{ vars.REACT_APP_MOVIE_API_URL }} .
-      
-      - name: Tag Docker Image
-        run: |
-          cd ./starter/frontend
-          docker tag frontend:latest 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+    - name:  Build, tag, and push image to Amazon ECR
+      working-directory: starter/frontend
+      run: |
+        docker build --build-arg REACT_APP_MOVIE_API_URL=${{ secrets.REACT_APP_MOVIE_API_URL }} -t frontend .
+        docker tag frontend:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+    
+    - name: Configure kubectl
+      run: |
+        aws eks update-kubeconfig --name cluster --region us-east-1
 
-      - name: Push Docker image to ECR
-        run: |
-          cd ./starter/frontend
-          docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
-      
-      - name: Kubeconfig Auth
-        run: |
-          aws eks update-kubeconfig --name ops-prj4 --region us-east-1
-      
-      - name: Deploy to Kubernetes
-        run: |
-          cd ./starter/frontend/k8s
-          kustomize edit set image frontend=669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
-          kustomize build | kubectl apply -f -
+    - name: Set image tag and apply to cluster
+      run: |
+        cd starter/frontend/k8s
+        kustomize edit set image frontend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+        kustomize build | kubectl apply -f -

@@ -1,83 +1,76 @@
-name: 'Backend Continuous Integration'
+name: continuous-integration-backend
 on:
   workflow_dispatch:
-
   pull_request:
     branches:
-      - main
+        - main
+    paths:
+      - 'starter/backend/**'
+  
+env:
+  PYTHON_VERSION: '3.10'
 
 jobs:
-  # lint
-  lint-job:
-    name: 'Lint Job'
+  lint:
     runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: starter/backend
 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.11'
+    - name: Use Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{env.PYTHON_VERSION}}
 
-      - name: Restore cache
-        uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          
-      - name: Install dependencies
-        run: |
-          cd ./starter/backend
-          python -m pip install --upgrade pip
-          pip install pipenv
-          pipenv install --dev
+    - name: Install Pipenv
+      run: pip install pipenv
 
-      - name: Run lint check
-        run: cd ./starter/backend && pipenv run lint
-  # test
-  test-job:
-    name: 'Test Job'
+    - name: Install project dependencies
+      run: pipenv install --dev 
+
+    - name: Lint code
+      run: pipenv run lint
+
+  test:
     runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: starter/backend
 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.11'
+    - name: Use Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{env.PYTHON_VERSION}}
 
-      - name: Restore cache
-        uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          
-      - name: Install dependencies
-        run: |
-          cd ./starter/backend
-          python -m pip install --upgrade pip
-          pip install pipenv
-          pipenv install pytest --dev
-          pipenv install --dev
+    - name: Install Pipenv
+      run: pip install pipenv
 
-      - name: Run tests
-        run: |
-          cd ./starter/backend 
-          pipenv run test
-  # build 
+    - name: Install project dependencies
+      run: pipenv install --dev 
+
+    - name: Run tests
+      run: pipenv run test
+
   build:
-    needs: [lint-job, test-job]
-    runs-on: ubuntu-latest 
-
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: starter/backend
+    needs:
+      - lint
+      - test 
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+    - name: Check out repository
+      uses: actions/checkout@v3
 
-      - name: Build Docker Image
-        run: |
-          cd ./starter/backend
-          docker build -t backend .
+    - name: Build docker image
+      run: |
+        docker build -t backend .
