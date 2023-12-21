@@ -1,67 +1,76 @@
-name: backend-ci
-
+name: continuous-integration-backend
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
+    paths:
+      - 'starter/backend/**'
+
+env:
+  PYTHON_VERSION: '3.10'
 
 jobs:
-  linting:
+  lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: starter/backend
 
     steps:
-    - name: Check the repository
-      uses: actions/checkout@v3
+      - name: Check out repository
+        uses: actions/checkout@v3
 
-    - name: setup python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
+      - name: Use Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{env.PYTHON_VERSION}}
 
-    - name: Install dependencies
-      working-directory: starter/backend 
-      run:  |
-        python -m pip install --upgrade pip
-        pip install pipenv
-        pip install flake8
+      - name: Install Pipenv
+        run: pip install pipenv
 
-    - name: Checkout run lint
-      run: cd starter/backend && pipenv run lint
+      - name: Install project dependencies
+        run: pipenv install --dev
+
+      - name: Lint code
+        run: pipenv run lint
 
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: starter/backend
 
     steps:
-    - name: Check the repository
-      uses: actions/checkout@v3
+      - name: Check out repository
+        uses: actions/checkout@v3
 
-    - name: Use python 3
-      uses:  actions/setup-python@v4
-      with:
-        python-version: "3.10"
+      - name: Use Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{env.PYTHON_VERSION}}
 
-    - name: Install dependencies
-      working-directory: starter/backend 
-      run:  |
-        python -m pip install --upgrade pip
-        pip install pipenv
-        pip install flake8
+      - name: Install Pipenv
+        run: pip install pipenv
 
-    - name: test
-      run: cd starter/backend && pipenv install pytest && pipenv run test
+      - name: Install project dependencies
+        run: pipenv install --dev
 
-      
+      - name: Run tests
+        run: pipenv run test
+
   build:
-    needs: [linting, test]
     runs-on: ubuntu-latest
-    
+    defaults:
+      run:
+        working-directory: starter/backend
+    needs:
+      - lint
+      - test
     steps:
-    - name: Check the repository
-      uses: actions/checkout@v3
+      - name: Check out repository
+        uses: actions/checkout@v3
 
-    - name: build docker image
-      run: |
-        cd starter/backend
-        docker build --tag mp-backend:latest .
-
+      - name: Build docker image
+        run: |
+          docker build -t backend .
