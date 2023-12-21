@@ -9,12 +9,13 @@ on:
 jobs:
   linting:
     runs-on: ubuntu-latest
+    environment: aws-access
 
     steps:
-    - name: Check the repository
+    - name: Check out the repository
       uses: actions/checkout@v3
 
-    - name: Use Node.js 18
+    - name: Set up Node.js 18
       uses: actions/setup-node@v3
       with:
         node-version: 18
@@ -25,17 +26,18 @@ jobs:
       working-directory: starter/frontend
       run: npm ci
 
-    - name: Checkout run lint
-      run: cd starter/frontend && npm run lint
+    - name: Run linting
+      working-directory: starter/frontend
+      run: npm run lint
 
   test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check the repository
+    - name: Check out the repository
       uses: actions/checkout@v3
 
-    - name: Use Node.js 18
+    - name: Set up Node.js 18
       uses: actions/setup-node@v3
       with:
         node-version: 18
@@ -46,20 +48,19 @@ jobs:
       working-directory: starter/frontend
       run: npm ci
   
-    - name: Test
-      run: cd starter/frontend && npm run test
-
-
+    - name: Run tests
+      working-directory: starter/frontend
+      run: npm run test
 
   build:
     needs: [linting, test]
     runs-on: ubuntu-latest
     
     steps:
-    - name: Check the repository
+    - name: Check out the repository
       uses: actions/checkout@v3
     
-    - name: Use Node.js 18
+    - name: Set up Node.js 18
       uses: actions/setup-node@v3
       with:
         node-version: 18
@@ -71,27 +72,23 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
     
     - name: Login to Amazon ECR
-      id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
-      # with:
-      #   mask-password: 'false'
 
-    - name: build and push docker image
-      uses: docker/build-push-action@v2
+    - name: Build and push Docker image
+      working-directory: starter/frontend
       run: |
-        cd starter/frontend
         docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:latest .
         docker push ${{ secrets.ECR_REGISTRY }}:latest
 
-    - name: Update kubeconfig
+    - name: Update kubeconfig for Amazon EKS
       run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
 
     - name: Deploy Docker Image to Amazon EKS using kubectl
       working-directory: starter/frontend/k8s
       run: |
-          kustomize edit set image frontend=${{ secrets.ECR_REGISTRY }}:frontend
-          kustomize build | kubectl apply -f -
+        kustomize edit set image frontend=${{ secrets.ECR_REGISTRY }}:latest
+        kustomize build | kubectl apply -f -
