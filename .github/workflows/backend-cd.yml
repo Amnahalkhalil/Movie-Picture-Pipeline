@@ -10,7 +10,7 @@ env:
   PYTHON_VERSION: "3.10"
   SRC_DIR: "${{ github.workspace }}/src/backend/"
   K8_DIR: "${{ github.workspace }}/src/backend/k8s"
-  ECR_REPO: "646184429643.dkr.ecr.us-east-1.amazonaws.com/backend"
+  ECR_REPO: "669172573612.dkr.ecr.us-east-1.amazonaws.com/backend"
   AWS_REGION: "us-east-1"
 
 jobs:
