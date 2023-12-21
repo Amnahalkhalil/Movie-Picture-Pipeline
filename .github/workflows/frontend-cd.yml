@@ -80,7 +80,7 @@ jobs:
 
     - name: Build and push Docker image
       run: |
-        docker push docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+        docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
       shell: /usr/bin/bash -e {0}
       env:
         AWS_DEFAULT_REGION: us-east-1
