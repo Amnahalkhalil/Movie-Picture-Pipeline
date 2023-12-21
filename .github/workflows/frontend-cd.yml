@@ -81,6 +81,7 @@ jobs:
       #   mask-password: 'false'
 
     - name: build and push docker image
+      uses: docker/build-push-action@v2
       run: |
         cd starter/frontend
         docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:latest .
