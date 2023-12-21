@@ -1,77 +1,76 @@
 name: Backend Continuous Integration
-
 on:
-  # Automatic trigger on pull request events targeting the main branch and backend application changes
+  workflow_dispatch:
   pull_request:
     branches:
       - main
-    path:
-      - 'backend/**'
-
-  # On demand run
-  workflow_dispatch:
-
-
-# Jobs defined in the workflow
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: bash
         working-directory: backend
     steps:
-      - name: Checkout code
+      - name: Checking Out the code from Repo
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Installing dependency manager pipenv
+        run: pip install pipenv
+
+      - name: Cache before dependency install
+        id: CachingData
+        uses: actions/cache@v3
         with:
-          python-version: '3.10'
-
-      - name: Install Dependencies
-        run: pip install pipenv && pipenv install
-
-      - name: Run linter
-        run: pip install flake8 && pipenv run lint
+          path: ~/.local/share/virtualenvs
+          key: deps-python-${{ hashFiles('**/Pipfile.lock') }}
+        
+      - name: Installing dependencies
+        run: |
+          pipenv install --dev
+          pipenv install flake8
+          
+      - name: Now Running Lint
+        run: pipenv run lint
 
   test:
+    name: Test
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: bash
         working-directory: backend
     steps:
-      - name: Checkout code
+      - name: Checking Out the code from Repo
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Installing dependency manager pipenv
+        run: pip install pipenv
+
+      - name: Cache before dependency install
+        id: CachingData
+        uses: actions/cache@v3
         with:
-          python-version: '3.10'
+          path: ~/.local/share/virtualenvs
+          key: deps-python-${{ hashFiles('**/Pipfile.lock') }}
 
-      - name: Install Dependencies
-        run: pip install pipenv && pipenv install
-
-      - name: Run tests
+      - name: Installing dependencies
+        run: |
+          pipenv install --dev
+          pipenv install flake8
+  
+      - name: Now Running Tests
         run: pipenv run test
 
   build:
-    needs: [lint, test]
-    if: success()
+    name: Build
     runs-on: ubuntu-latest
+    needs: [lint,test]
     defaults:
       run:
-        shell: bash
         working-directory: backend
     steps:
-      - name: Checkout code
+      - name: Checking Out the code from Repo
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install Dependencies
-        run: pip install pipenv && pipenv install
+      - name: Building the Image
+        run: docker build .
