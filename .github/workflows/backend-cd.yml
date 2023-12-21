@@ -1,99 +1,61 @@
-name: continuous-deployment-backend
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'starter/backend/**'
+name: Backend Continuous Deployment
 
-env:
-  PYTHON_VERSION: '3.10'
+on: 
+  push_request_target:
+    branches: 
+      - main
+  workflow_dispatch:
 
 jobs:
-  lint:
+  build_and_deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: starter/backend
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      - name: Use Python
-        uses: actions/setup-python@v4
+      - name: Setup NodeJS
+        uses: actions/setup-node@v2
         with:
-          python-version: ${{env.PYTHON_VERSION}}
+          node-version: '14'
 
-      - name: Install Pipenv
-        run: pip install pipenv
-
-      - name: Install project dependencies
-        run: pipenv install --dev
-
-      - name: Lint code
-        run: pipenv run lint
-
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: starter/backend
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
-      - name: Use Python
-        uses: actions/setup-python@v4
+      - name: Restore Cache
+        uses: actions/cache@v2
         with:
-          python-version: ${{env.PYTHON_VERSION}}
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-      - name: Install Pipenv
-        run: pip install pipenv
+      - name: Install dependencies
+        run: npm install
 
-      - name: Install project dependencies
-        run: pipenv install --dev
+      - name: Run lint
+        run: npm run lint
 
       - name: Run tests
-        run: pipenv run test
+        run: npm run test
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs:
-      - lint
-      - test
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
+      - name: Build Docker image
+        run: docker build -t backend .
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region: us-east-1
 
-      - name: Log in to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Tag Docker Image
+        run: docker tag backend:latest 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
-      - name: Build, tag, and push image to Amazon ECR
-        working-directory: starter/backend
-        run: |
-          docker build -t backend:${GITHUB_SHA} .
-          docker tag backend:${GITHUB_SHA} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:${GITHUB_SHA}
-          docker tag backend:${GITHUB_SHA} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:${GITHUB_SHA}
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+      - name: Push Docker image to ECR
+        run: docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
-      - name: Configure kubectl
-        run: |
-          aws eks update-kubeconfig --name cluster --region us-east-1
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v1
 
-      - name: Set image tag and apply to cluster
-        run: |
-          cd starter/backend/k8s
-          kustomize edit set image backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:${GITHUB_SHA}
-          kustomize build | kubectl apply -f -
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f deployment.yml
+        env:
+          KUBECONFIG_FILE: ${{ secrets.KUBECONFIG_FILE }}

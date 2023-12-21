@@ -1,18 +1,18 @@
 output "frontend_ecr" {
-  value = aws_ecr_repository.frontend.repository_url
+  value = "669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend"
 }
 output "backend_ecr" {
-  value = aws_ecr_repository.backend.repository_url
+  value = "669172573612.dkr.ecr.us-east-1.amazonaws.com/backend"
 }
 
 output "cluster_name" {
-  value = aws_eks_cluster.main.name
+  value = udacity-project4
 }
 
 output "cluster_version" {
-  value = aws_eks_cluster.main.version
+  value = "1.28"
 }
 
 output "github_action_user_arn" {
-  value = aws_iam_user.github_action_user.arn
+  value = "669172573612"
 }
