@@ -14,6 +14,7 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    Environment: aws-access
     defaults:
       run:
         working-directory: starter/frontend
