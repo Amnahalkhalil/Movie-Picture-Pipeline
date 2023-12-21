@@ -78,7 +78,7 @@ jobs:
     - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
+    - name: Build and push Docker image
       run: |
         docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}/frontend:latest .
         docker push ${{ secrets.ECR_REGISTRY }}/frontend:latest
