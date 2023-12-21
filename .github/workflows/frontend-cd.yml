@@ -1,111 +1,81 @@
-name: Frontend Deployment (CD)
-
+name: 'Frontend Continuous Deployment'
 on:
   workflow_dispatch:
-  push:
+
+  pull_request:
     branches:
       - main
 
-env:
-  NODE_VERSION: "latest"
-  SRC_DIR: "${{ github.workspace }}/src/frontend/"
-  K8_DIR: "${{ github.workspace }}/src/frontend/k8s"
-  AWS_REGION: "us-east-1"
-
 jobs:
-  lint:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: checkout code
         uses: actions/checkout@v3
 
-      - name: Setup NodeJS ${{env.NODE_VERSION}}
+      - name: Setup nodejs
         uses: actions/setup-node@v3
         with:
-          node-version: ${{env.NODE_VERSION}}
-          cache: "npm"
-          cache-dependency-path: "${{ env.SRC_DIR}}/package-lock.json"
-      - name: Install dependencies
-        run: cd ${{env.SRC_DIR}} && npm ci
-      - name: Run linting
-        run: cd ${{env.SRC_DIR}} && npm run lint
+          node-version: 14
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup NodeJS ${{env.NODE_VERSION}}
-        uses: actions/setup-node@v3
+      - name: Restore dependencies
+        id: cache
+        uses: actions/cache@v3
         with:
-          node-version: ${{env.NODE_VERSION}}
-          cache: "npm"
-          cache-dependency-path: "${{ env.SRC_DIR}}/package-lock.json"
-      # TODO: Perform a cache action to restore cache before deps install.
+          path: ~/.npm
+          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+
       - name: Install dependencies
-        run: cd ${{env.SRC_DIR}} && npm ci
-      - name: Run tests
-        run: cd ${{env.SRC_DIR}} && npm test
-  build-deploy:
-    runs-on: ubuntu-latest
-    needs: [lint, test]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+        run: cd ./starter/frontend && npm install
 
-      - name: Use NodeJS ${{env.NODE_VERSION}}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{env.NODE_VERSION}}
-          cache: "npm"
-          cache-dependency-path: "${{ env.SRC_DIR}}/package-lock.json"
-
-      # TODO: Perform a cache action to restore cache before deps install.
-      - name: Install dependencies
-        run: cd ${{env.SRC_DIR}} && npm ci
-
-      - name: Build
-        run: cd ${{env.SRC_DIR}} && npm test
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push docker image to Amazon ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: frontend
-          IMAGE_TAG: ${{ github.sha }}
-
+      - name: Install prettier
         run: |
-          cd ${{env.SRC_DIR}}
-          docker build --build-arg=REACT_APP_MOVIE_API_URL=${{secrets.BACKEND_API_URL}} --tag=$REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          cd ./starter/frontend 
+          npm install prettier@2.8.8 --save-dev
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      - name: Run lint check
+        run: cd ./starter/frontend && npm run lint
+
+      - name: Run test
+        run: cd ./starter/frontend && npm run test
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          version: "latest"
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
 
+      - name: ECR Login
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region: us-east-1
+
+      - name: Build Docker image
+        run: |
+          cd ./starter/frontend
+          docker build -t frontend --build-arg=REACT_APP_MOVIE_API_URL=${{ vars.REACT_APP_MOVIE_API_URL }} .
+      
+      - name: Tag Docker Image
+        run: |
+          cd ./starter/frontend
+          docker tag frontend:latest 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+
+      - name: Push Docker image to ECR
+        run: |
+          cd ./starter/frontend
+          docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+      
+      - name: Kubeconfig Auth
+        run: |
+          aws eks update-kubeconfig --name ops-prj4 --region us-east-1
+      
       - name: Deploy to Kubernetes
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: frontend
-          IMAGE_TAG: ${{ github.sha }}
-          KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
         run: |
-          cd ${{env.K8_DIR}}
-          aws eks update-kubeconfig --name=cluster
-          echo "frontend=$REGISTRY/$REPOSITORY:$IMAGE_TAG"
-
-          kustomize edit set image frontend=$REGISTRY/$REPOSITORY:$IMAGE_TAG
+          cd ./starter/frontend/k8s
+          kustomize edit set image frontend=669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
           kustomize build | kubectl apply -f -

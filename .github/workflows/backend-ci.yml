@@ -1,96 +1,83 @@
-name: Backend Integration (CI)
-
+name: 'Backend Continuous Integration'
 on:
   workflow_dispatch:
+
   pull_request:
     branches:
       - main
 
-env:
-  PYTHON_VERSION: "3.10"
-  # SRC_DIR - path to the backend root src folder
-  SRC_DIR: "${{ github.workspace }}/src/backend/"
-  AWS_REGION: "us-east-1"
-
 jobs:
-  lint:
+  # lint
+  lint-job:
+    name: 'Lint Job'
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python ${{env.PYTHON_VERSION}}
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          python-version: ${{env.PYTHON_VERSION}}
-          cache: "pipenv"
+          python-version: '3.11'
 
-      - name: Install pipenv
-        run: pip install pipenv
-
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          
       - name: Install dependencies
-        run: cd ${{env.SRC_DIR}} && pipenv install --dev
-      - name: Run linter
-        run: cd ${{env.SRC_DIR}} && pipenv run lint
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python ${{env.PYTHON_VERSION}}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{env.PYTHON_VERSION}}
-          cache: "pipenv"
-
-      - name: Install pipenv
-        run: pip install pipenv
-
-      - name: Install dependencies
-        run: cd ${{env.SRC_DIR}} && pipenv install --dev
-
-      - name: Run linter
-        run: cd ${{env.SRC_DIR}} && pipenv run test
-
-  build:
-    needs: [lint, test]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python ${{env.PYTHON_VERSION}}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{env.PYTHON_VERSION}}
-          cache: "pipenv"
-
-      - name: Install pipenv
-        run: pip install pipenv
-
-      - name: Install dependencies
-        run: cd ${{env.SRC_DIR}} && pipenv install --dev
-      - name: Run linter
-        run: cd ${{env.SRC_DIR}} && pipenv run test
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build Docker image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: backend
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd ${{env.SRC_DIR}}
-          docker build --tag=$REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          cd ./starter/backend
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pipenv install --dev
+
+      - name: Run lint check
+        run: cd ./starter/backend && pipenv run lint
+  # test
+  test-job:
+    name: 'Test Job'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          
+      - name: Install dependencies
+        run: |
+          cd ./starter/backend
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pipenv install pytest --dev
+          pipenv install --dev
+
+      - name: Run tests
+        run: |
+          cd ./starter/backend 
+          pipenv run test
+  # build 
+  build:
+    needs: [lint-job, test-job]
+    runs-on: ubuntu-latest 
+
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: |
+          cd ./starter/backend
+          docker build -t backend .

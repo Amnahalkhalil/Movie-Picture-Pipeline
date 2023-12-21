@@ -1,104 +1,82 @@
-name: Backend Deployment (CD)
-
+name: 'Backend Continuous Deployment'
 on:
   workflow_dispatch:
-  push:
+
+  pull_request:
     branches:
       - main
 
-env:
-  PYTHON_VERSION: "3.10"
-  SRC_DIR: "${{ github.workspace }}/src/backend/"
-  K8_DIR: "${{ github.workspace }}/src/backend/k8s"
-  ECR_REPO: "669172573612.dkr.ecr.us-east-1.amazonaws.com/backend"
-  AWS_REGION: "us-east-1"
-
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest 
+
     steps:
-      - name: Checkout repository
+      - name: checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python ${{env.PYTHON_VERSION}}
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          python-version: ${{env.PYTHON_VERSION}}
-          cache: "pipenv"
+          python-version: '3.11'
 
-      - name: Install pipenv
-        run: pip install pipenv
-
-      - name: Install dependencies and lint
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          
+      - name: Install dependencies
         run: |
-          cd ${{env.SRC_DIR}}
+          cd ./starter/backend
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pipenv install pytest --dev
           pipenv install --dev
-          pipenv run lint
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python ${{env.PYTHON_VERSION}}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{env.PYTHON_VERSION}}
-          cache: "pipenv"
-
-      - name: Install pipenv
-        run: pip install pipenv
-
-      - name: Install dependencies and lint
+      
+      - name: Run lint check
+        run: cd ./starter/backend && pipenv run lint
+      
+      - name: Run tests
         run: |
-          cd ${{env.SRC_DIR}}
-          pipenv install --dev
-          pipenv run lint
-  build-deploy:
-    needs: [lint, test]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+          cd ./starter/backend 
+          pipenv run test
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
 
-      - name: Login to Amazon ECR
-        id: login-ecr
+      - name: ECR Login
         uses: aws-actions/amazon-ecr-login@v2
-      # Build and push
-      - name: Build, tag, and push docker image to Amazon ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: backend
-          IMAGE_TAG: ${{ github.sha }}
-
-        run: |
-          cd ${{env.SRC_DIR}}
-          docker build --tag=$REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-
-      - name: Setup kubectl + Kustomize
-        uses: azure/setup-kubectl@v3
         with:
-          version: "latest"
-      # Deploy K8 manifests
-      - name: Deploy to Kubernetes
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: backend
-          IMAGE_TAG: ${{ github.sha }}
-          KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
-        run: |
-          cd ${{env.K8_DIR}}
-          aws eks update-kubeconfig --name=cluster
-          echo "backend=$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-          kustomize edit set image backend=$REGISTRY/$REPOSITORY:$IMAGE_TAG
+      - name: Build Docker image
+        run: |
+          cd ./starter/backend
+          docker build -t backend .
+      
+      - name: Tag Docker Image
+        run: |
+          cd ./starter/backend
+          docker tag backend:latest 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+
+      - name: Push Docker image to ECR
+        run: |
+          cd ./starter/backend
+          docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+      
+      - name: Kubeconfig Auth
+        run: |
+          aws eks update-kubeconfig --name ops-prj4 --region us-east-1
+
+      - name: Deploy to Kubernetes
+        run: |
+          cd ./starter/backend/k8s
+          kustomize edit set image backend=669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           kustomize build | kubectl apply -f -
