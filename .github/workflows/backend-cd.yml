@@ -1,97 +1,106 @@
-name: continuous-deployment-backend
+name: Backend Continuous Deployment
+
 on:
-  workflow_dispatch:
+  # Automatic trigger on push events targeting the main branch and backend application changes
   push:
     branches:
       - main
-    paths:
-      - 'starter/backend/**'
-  
-env:
-  PYTHON_VERSION: '3.10'
+    path:
+      - 'backend/**'
 
+  # On demand run
+  workflow_dispatch:
+
+
+# Jobs defined in the workflow
 jobs:
   lint:
     runs-on: ubuntu-latest
     defaults:
-        run:
-          working-directory: starter/backend
-
+      run:
+        shell: bash
+        working-directory: backend
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Use Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{env.PYTHON_VERSION}}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install Pipenv
-      run: pip install pipenv
+      - name: Install Dependencies
+        run: pip install pipenv && pipenv install
 
-    - name: Install project dependencies
-      run: pipenv install --dev 
-
-    - name: Lint code
-      run: pipenv run lint
+      - name: Run linter
+        run: pip install flake8 && pipenv run lint
 
   test:
     runs-on: ubuntu-latest
     defaults:
-        run:
-          working-directory: starter/backend
-
+      run:
+        shell: bash
+        working-directory: backend
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Use Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{env.PYTHON_VERSION}}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install Pipenv
-      run: pip install pipenv
+      - name: Install Dependencies
+        run: pip install pipenv && pipenv install
 
-    - name: Install project dependencies
-      run: pipenv install --dev 
+      - name: Run tests
+        run: pipenv run test
 
-    - name: Run tests
-      run: pipenv run test
-
-  deploy:
+  build_push_and_deploy_image:
+    needs: [lint, test]
+    if: success()
     runs-on: ubuntu-latest
-    needs:
-      - lint
-      - test 
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+          aws-region: us-east-1
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Log in to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_NAME: backend
+        run: |
+          docker build -t $ECR_REGISTRY/$IMAGE_NAME:release-pipeline-${GITHUB_SHA::7} .
+          docker push $ECR_REGISTRY/$IMAGE_NAME:release-pipeline-${GITHUB_SHA::7}
 
-    - name: Build, tag, and push image to Amazon ECR
-      working-directory: starter/backend
-      run: |
-        docker build -t backend .
-        docker tag backend:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-    
-    - name: Configure kubectl
-      run: |
-        aws eks update-kubeconfig --name cluster --region us-east-1
+      - name: Kubeconfig Auth
+        env:
+          CLUSTER_NAME: cluster
+        run: |
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ vars.AWS_REGION }}
 
-    - name: Set image tag and apply to cluster
-      run: |
-        cd starter/backend/k8s
-        kustomize edit set image backend=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-        kustomize build | kubectl apply -f -s
+      - name: Deploy the Docker image to Amazon EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_NAME: backend
+          DEPLOYMENT_NAME: backend
+        run: |
+          cd k8s
+          kustomize edit set image backend=$ECR_REGISTRY/$IMAGE_NAME:release-pipeline-${GITHUB_SHA::7}
+          kustomize build | kubectl apply -f -
+          kubectl rollout status deployment/$DEPLOYMENT_NAME
+          kubectl get services -o wide

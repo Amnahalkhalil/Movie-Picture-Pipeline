@@ -1,76 +1,77 @@
-name: continuous-integration-backend
+name: Backend Continuous Integration
+
 on:
-  workflow_dispatch:
+  # Automatic trigger on pull request events targeting the main branch and backend application changes
   pull_request:
     branches:
-        - main
-    paths:
-      - 'starter/backend/**'
-  
-env:
-  PYTHON_VERSION: '3.10'
+      - main
+    path:
+      - 'backend/**'
 
+  # On demand run
+  workflow_dispatch:
+
+
+# Jobs defined in the workflow
 jobs:
   lint:
     runs-on: ubuntu-latest
     defaults:
-        run:
-          working-directory: starter/backend
-
+      run:
+        shell: bash
+        working-directory: backend
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Use Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{env.PYTHON_VERSION}}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install Pipenv
-      run: pip install pipenv
+      - name: Install Dependencies
+        run: pip install pipenv && pipenv install
 
-    - name: Install project dependencies
-      run: pipenv install --dev 
-
-    - name: Lint code
-      run: pipenv run lint
+      - name: Run linter
+        run: pip install flake8 && pipenv run lint
 
   test:
     runs-on: ubuntu-latest
     defaults:
-        run:
-          working-directory: starter/backend
-
+      run:
+        shell: bash
+        working-directory: backend
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Use Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{env.PYTHON_VERSION}}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install Pipenv
-      run: pip install pipenv
+      - name: Install Dependencies
+        run: pip install pipenv && pipenv install
 
-    - name: Install project dependencies
-      run: pipenv install --dev 
-
-    - name: Run tests
-      run: pipenv run test
+      - name: Run tests
+        run: pipenv run test
 
   build:
+    needs: [lint, test]
+    if: success()
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: starter/backend
-    needs:
-      - lint
-      - test 
+        shell: bash
+        working-directory: backend
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Build docker image
-      run: |
-        docker build -t backend .
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install pipenv && pipenv install
