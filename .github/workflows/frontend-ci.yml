@@ -1,4 +1,4 @@
-name: frontend-ci
+name: Frontend Integration (CI)
 
 on:
   workflow_dispatch:
@@ -6,66 +6,74 @@ on:
     branches:
       - main
 
+env:
+  NODE_VERSION: "latest"
+  # SRC_DIR - path to the frontend root src folder
+  SRC_DIR: "${{ github.workspace }}/src/frontend/"
+  AWS_REGION: "us-east-1"
+
 jobs:
-  linting:
+  lint:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Check the repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v3
-      with:
-        node-version: 18
-        cache: 'npm'
-        cache-dependency-path: starter/frontend/package-lock.json
+      - name: Setup NodeJS ${{env.NODE_VERSION}}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+          cache: "npm"
+          cache-dependency-path: "${{ env.SRC_DIR}}/package-lock.json"
 
-    - name: Install dependencies
-      working-directory: starter/frontend
-      run: npm ci
+      - name: Install dependencies
+        run: cd ${{env.SRC_DIR}} && npm ci
 
-    - name: Checkout run lint
-      run: cd starter/frontend && npm run lint
-
+      - name: Run linter
+        run: cd ${{env.SRC_DIR}} && npm run lint
   test:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Check the repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v3
-      with:
-        node-version: 18
-        cache: 'npm'
-        cache-dependency-path: starter/frontend/package-lock.json
-    - name: Install dependencies
-      working-directory: starter/frontend
-      run: npm ci
-  
-    - name: Test
-      run: cd starter/frontend && npm run test
-      
+      - name: Use NodeJS ${{env.NODE_VERSION}}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+          cache: "npm"
+          cache-dependency-path: "${{ env.SRC_DIR}}/package-lock.json"
+
+      - name: Install dependencies
+        run: cd ${{env.SRC_DIR}} && npm ci
+
+      - name: Build
+        run: cd ${{env.SRC_DIR}} && npm test
+
   build:
-    needs: [linting, test]
+    needs: [lint, test]
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Check the repository
-      uses: actions/checkout@v3
-    
-    - name: Use Node.js 18
-      uses: actions/setup-node@v3
-      with:
-        node-version: 18
-        cache: 'npm'
-        cache-dependency-path: starter/frontend/package-lock.json
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: build and run docker image
-      run: |
-        cd starter/frontend
-        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag=mp-frontend:latest .
-        docker run --name mp-frontend -p 3000:3000 -d mp-frontend
+      # Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd ${{env.SRC_DIR}}
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
