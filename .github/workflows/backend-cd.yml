@@ -1,61 +1,94 @@
-name: Backend Continuous Deployment
+name: backend-cd
 
-on: 
-  push_request_target:
-    branches: 
-      - main
+on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  build_and_deploy:
+  linting:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: Check the repository
+      uses: actions/checkout@v3
 
-      - name: Setup NodeJS
-        uses: actions/setup-node@v2
-        with:
-          node-version: '14'
+    - name: setup python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
 
-      - name: Restore Cache
-        uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+    - name: Install dependencies
+      working-directory: starter/backend 
+      run:  |
+        python -m pip install --upgrade pip
+        pip install pipenv
+        pip install flake8
 
-      - name: Install dependencies
-        run: npm install
+    - name: Checkout run lint
+      run: cd starter/backend && pipenv run lint
 
-      - name: Run lint
-        run: npm run lint
+  test:
+    runs-on: ubuntu-latest
 
-      - name: Run tests
-        run: npm run test
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
 
-      - name: Build Docker image
-        run: docker build -t backend .
+    - name: Use python 3
+      uses:  actions/setup-python@v4
+      with:
+        python-version: "3.10"
 
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v1
-        with:
-          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          region: us-east-1
+    - name: Install dependencies
+      working-directory: starter/backend 
+      run:  |
+        python -m pip install --upgrade pip
+        pip install pipenv
+        pip install flake8
 
-      - name: Tag Docker Image
-        run: docker tag backend:latest 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+    - name: test
+      run: cd starter/backend && pipenv install pytest && pipenv run test
 
-      - name: Push Docker image to ECR
-        run: docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+      
+  build:
+    needs: [linting, test]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
 
-      - name: Setup Kubectl
-        uses: azure/setup-kubectl@v1
 
-      - name: Deploy to Kubernetes
-        run: kubectl apply -f deployment.yml
-        env:
-          KUBECONFIG_FILE: ${{ secrets.KUBECONFIG_FILE }}
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+        aws-region: us-east-1
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: build and push docker image
+      run: |
+        cd starter/backend
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:backend .
+        docker push ${{ secrets.ECR_REGISTRY }}:backend
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
+
+    - name: Deploy Docker Image to Amazon EKS using kubectl
+      working-directory: starter/backend/k8s
+      run: |
+          kustomize edit set image backend=${{ secrets.ECR_REGISTRY }}:backend
+          kustomize build | kubectl apply -f -
+
+
+
+
