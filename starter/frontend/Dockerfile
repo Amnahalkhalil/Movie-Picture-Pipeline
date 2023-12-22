@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install packages
-RUN npm ci
+RUN npm ci  --ignore-engines
 
 # Copy code
 COPY . .
