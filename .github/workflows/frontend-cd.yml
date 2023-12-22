@@ -78,18 +78,24 @@ jobs:
     - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v2
 
-    #- name: Build and push Docker image
-    #  env:
+    - name: Build and push Docker image
+      env:
     #    AWS_DEFAULT_REGION: us-east-1
     #    AWS_REGION: us-east-1
     #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    #    IMAGE_TAG: latest
+        IMAGE_TAG: latest
     #    REACT_APP_MOVIE_API_URL: ${{ REACT_APP_MOVIE_API_URL }}
     #  run: |
     #    docker build -t 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG -f starter/frontend/Dockerfile .
     #    docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
-    
+     run: |
+       aws eks update-kubeconfig --name cluster
+       export EXTERNALIP=$(kubectl get svc frontend -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}{.status.loadBalancer.ingress[0].ip}')
+       echo $EXTERNALIP
+       docker build -t 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG--build-arg=REACT_APP_MOVIE_API_URL=http://$EXTERNALIP .
+       docker images
+       docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
 
     #- name: Update kubeconfig for Amazon EKS
     #  run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
