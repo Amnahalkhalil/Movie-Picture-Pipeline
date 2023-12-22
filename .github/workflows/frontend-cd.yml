@@ -86,7 +86,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         IMAGE_TAG: latest
       run: |
-        docker build -t 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG .
+        docker build -t 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG starter/frontend/Dockerfile .
         docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
     
 
