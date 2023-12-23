@@ -84,7 +84,7 @@ jobs:
 
     - name: Update kubeconfig
       run:
-      aws eks update-kubeconfig --name udacity-project4 --region us-east-1
+       aws eks update-kubeconfig --name udacity-project4 --region us-east-1
 
     - name: Deploy Docker Image to Amazon EKS using kubectl
       run: |

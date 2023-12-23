@@ -81,7 +81,7 @@ jobs:
     - name: Build and push Docker image
       env:
         IMAGE_TAG: latest
-     run: |
+      run: |
        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG .
        docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
 
