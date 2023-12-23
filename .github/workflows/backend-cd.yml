@@ -90,4 +90,4 @@ jobs:
         cd ./starter/backend/k8s
         ls -l
         aws eks update-kubeconfig --name udacity-project4 --region us-east-1
-        kubectl apply -f deployment.yml
+        kubectl apply -f deployment.yaml
