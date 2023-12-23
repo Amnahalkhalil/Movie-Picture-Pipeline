@@ -80,21 +80,10 @@ jobs:
 
     - name: Build and push Docker image
       env:
-    #    AWS_DEFAULT_REGION: us-east-1
-    #    AWS_REGION: us-east-1
-    #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         IMAGE_TAG: latest
-    #    REACT_APP_MOVIE_API_URL: ${{ REACT_APP_MOVIE_API_URL }}
-    #  run: |
-    #    docker build -t 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG -f starter/frontend/Dockerfile .
-    #    docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
      run: |
        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG .
        docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
-
-    #- name: Update kubeconfig for Amazon EKS
-    #  run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
 
    # - name: Deploy Docker Image to Amazon EKS using kubectl
     #  working-directory: starter/frontend/k8s
