@@ -89,7 +89,7 @@ jobs:
       run: |
          cd starter/backend/k8s
          kustomize edit set image backend=669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-         kustomize build | kubectl apply -f -
+         kustomize build | kubectl apply -f -  --validate=false
 
 
 
