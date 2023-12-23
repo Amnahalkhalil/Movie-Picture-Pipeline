@@ -75,23 +75,20 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: build and push docker image
-      env:
-        IMAGE_TAG: latest
       run: |
         cd starter/backend
-        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:$IMAGE_TAG .
-        docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:$IMAGE_TAG
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag ${{ secrets.ECR_REGISTRY }}:backend .
+        docker push ${{ secrets.ECR_REGISTRY }}:backend
 
     - name: Update kubeconfig
-      run:
-       aws eks update-kubeconfig --name udacity-project4 --region us-east-1
+      run: aws eks update-kubeconfig --region us-east-1 --name project4-cluster
 
     - name: Deploy Docker Image to Amazon EKS using kubectl
+      working-directory: starter/backend/k8s
       run: |
-         aws eks update-kubeconfig --name udacity-project4 --region us-east-1
-         cd starter/backend/k8s
-         kustomize edit set image backend=669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-         kustomize build . | kubectl apply -f -
+          kustomize edit set image backend=${{ secrets.ECR_REGISTRY }}:backend
+          kustomize build | kubectl apply -f -
+
 
 
 
