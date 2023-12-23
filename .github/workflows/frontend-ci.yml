@@ -1,0 +1,71 @@
+name: frontend-ci
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: starter/frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: starter/frontend
+      run: npm ci
+
+    - name: Checkout run lint
+      run: cd starter/frontend && npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: starter/frontend/package-lock.json
+    - name: Install dependencies
+      working-directory: starter/frontend
+      run: npm ci
+  
+    - name: Test
+      run: cd starter/frontend && npm run test
+      
+  build:
+    needs: [linting, test]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check the repository
+      uses: actions/checkout@v3
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: starter/frontend/package-lock.json
+
+    - name: build and run docker image
+      run: |
+        cd starter/frontend
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag=mp-frontend:latest .
+        docker run --name mp-frontend -p 3000:3000 -d mp-frontend
+
