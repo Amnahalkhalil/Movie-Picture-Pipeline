@@ -83,14 +83,14 @@ jobs:
         docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:$IMAGE_TAG
 
     - name: Update kubeconfig
-      run: aws eks update-kubeconfig --region us-east-1 --name udacity-project4
+      run:
+      aws eks update-kubeconfig --name udacity-project4 --region us-east-1
 
     - name: Deploy Docker Image to Amazon EKS using kubectl
       run: |
          cd starter/backend/k8s
          kustomize edit set image backend=669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-         kustomize build | kubectl apply -f -  --validate=false
-
+         kustomize build | kubectl apply -f -
 
 
 
