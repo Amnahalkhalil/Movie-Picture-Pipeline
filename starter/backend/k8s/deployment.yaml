@@ -1,21 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: ecr-app
   labels:
-    app: backend
+    app: ecr-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backend
+      app: ecr-app
   template:
     metadata:
       labels:
-        app: backend
+        app: ecr-app
     spec:
       containers:
-        - name: backend
-          image: backend
+        - name: ecr-app-pod
+          image: {ecr-image-url}
           ports:
             - containerPort: 5000
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: arm64
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecr-app-service
+spec:
+  selector:
+    app: ecr-app
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: LoadBalancer
