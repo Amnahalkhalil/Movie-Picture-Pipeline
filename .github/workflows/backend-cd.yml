@@ -87,7 +87,6 @@ jobs:
 
     - name: Deploy Docker Image to Amazon EKS using kubectl
       run: |
-        cd ./starter/backend
-        cd k8s
+        cd ./starter/backend/k8s
         aws eks update-kubeconfig --name udacity-project4 --region us-east-1
         kubectl apply -f deployment.yml
