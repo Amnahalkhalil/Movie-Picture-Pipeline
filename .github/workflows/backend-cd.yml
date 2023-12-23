@@ -79,7 +79,7 @@ jobs:
         IMAGE_TAG: latest
       run: |
         cd starter/backend
-        docker build --build-arg=REACT_APP_MOVIE_API_URL=https://oidc.eks.us-east-1.amazonaws.com/id/3948513CE1303ED8BC328B8824053A96:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:$IMAGE_TAG .
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:$IMAGE_TAG .
         docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:$IMAGE_TAG
     - name: Update kubeconfig
       run:
