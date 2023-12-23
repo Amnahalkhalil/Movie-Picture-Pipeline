@@ -88,7 +88,7 @@ jobs:
     - name: Deploy Docker Image to Amazon EKS using kubectl
       working-directory: starter/backend/k8s
       run: |
-          kustomize edit set image 669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+          kustomize edit set image backend=669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           kustomize build | kubectl apply -f -
 
 
