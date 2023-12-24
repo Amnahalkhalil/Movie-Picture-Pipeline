@@ -9,6 +9,7 @@ on:
 jobs:
   Linting:
     runs-on: ubuntu-latest
+    environment: Devlopmnet Environment
 
     steps:
     - name: Check the Repository
