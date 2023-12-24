@@ -1,4 +1,4 @@
-name: frontend-cd
+name: Frontend Continuous Deployment
 
 on:
   workflow_dispatch:
