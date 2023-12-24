@@ -90,6 +90,5 @@ jobs:
       run: |
         ls -l
         aws eks update-kubeconfig --name udacity-project4 --region us-east-1
-        kubectl apply -f deployment.yaml
         kustomize edit set image backend=669172573612.dkr.ecr.us-east-1.amazonaws.com/backend:latest
         kustomize build | kubectl apply -f -
