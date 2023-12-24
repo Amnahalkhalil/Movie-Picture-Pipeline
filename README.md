@@ -473,4 +473,8 @@ kustomize build | kubectl apply -f -
 
 ## License
 
+<<<<<<< HEAD
 [License](LICENSE.md)
+=======
+[License](LICENSE.md)
+>>>>>>> 6e3201b42d7ed8aaa2cbf4753c973e3d53d4c407
