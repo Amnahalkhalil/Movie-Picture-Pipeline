@@ -82,7 +82,7 @@ jobs:
 
 
     - name: Build and Push Docker Image
-      working-directory: starter/frontend/
+      working-directory: starter/frontend
       env:
         IMAGE_TAG: latest
         REPO_NAME: frontend
