@@ -7,14 +7,14 @@ on:
       - main
 
 jobs:
-  linting:
+  Linting:
     runs-on: ubuntu-latest
 
     steps:
     - name: Check the Repository
       uses: actions/checkout@v3
 
-    - name: setup python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.10"
@@ -29,7 +29,7 @@ jobs:
     - name: Checkout Run Lint
       run: cd starter/backend && pipenv run lint
 
-  test:
+  Test:
     runs-on: ubuntu-latest
 
     steps:
@@ -52,8 +52,8 @@ jobs:
       run: cd starter/backend && pipenv install pytest && pipenv run test
 
       
-  build:
-    needs: [linting, test]
+  Build:
+    needs: [Linting, Test]
     runs-on: ubuntu-latest
     
     steps:
@@ -82,7 +82,7 @@ jobs:
       run: |
         docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG .
         docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG
-    - name: Update kubeconfig
+    - name: Update Kubeconfig
       run:
        aws eks update-kubeconfig --name udacity-project4 --region us-east-1
 

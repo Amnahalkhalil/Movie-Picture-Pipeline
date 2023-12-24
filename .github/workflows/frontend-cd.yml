@@ -7,11 +7,11 @@ on:
       - main
 
 jobs:
-  linting:
+  Linting:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check the repository
+    - name: Check the Repository
       uses: actions/checkout@v3
 
     - name: Use Node.js 18
@@ -28,11 +28,11 @@ jobs:
     - name: Checkout Run Lint
       run: cd starter/frontend && npm run lint
 
-  test:
+  Test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check the repository
+    - name: Check the Repository
       uses: actions/checkout@v3
 
     - name: Use Node.js 18
@@ -51,12 +51,12 @@ jobs:
 
 
 
-  build:
-    needs: [linting, test]
+  Build:
+    needs: [Linting, Test]
     runs-on: ubuntu-latest
     
     steps:
-    - name: Check the Repo
+    - name: Check the Repository
       uses: actions/checkout@v3
     
     - name: Use Node.js 18

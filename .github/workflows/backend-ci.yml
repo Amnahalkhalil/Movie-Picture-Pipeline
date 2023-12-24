@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  linting:
+  Linting:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,7 @@ jobs:
     - name: Checkout Run Lint
       run: cd starter/backend && pipenv run lint
 
-  test:
+  Test:
     runs-on: ubuntu-latest
 
     steps:
@@ -52,8 +52,8 @@ jobs:
       run: cd starter/backend && pipenv install pytest && pipenv run test
 
       
-  build:
-    needs: [linting, test]
+  Build:
+    needs: [Linting, Test]
     runs-on: ubuntu-latest
     
     steps:
