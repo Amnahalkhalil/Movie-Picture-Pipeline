@@ -21,11 +21,11 @@ jobs:
         cache: 'npm'
         cache-dependency-path: starter/frontend/package-lock.json
 
-    - name: Install dependencies
+    - name: Install Dependencies
       working-directory: starter/frontend
       run: npm ci
 
-    - name: Checkout run lint
+    - name: Checkout Run Lint
       run: cd starter/frontend && npm run lint
 
   test:
@@ -42,7 +42,7 @@ jobs:
         cache: 'npm'
         cache-dependency-path: starter/frontend/package-lock.json
         
-    - name: Install dependencies
+    - name: Install Dependencies
       working-directory: starter/frontend
       run: npm ci
   
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Check the repository
+    - name: Check the Repo
       uses: actions/checkout@v3
     
     - name: Use Node.js 18
@@ -73,25 +73,35 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
         aws-region: us-east-1
-    
-    - name: Login to Amazon ECR
+  
+
+    - name: Login to Amazon 
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
-      # with:
-      #   mask-password: 'false'
-    - name: build and push docker image
+
+
+
+    - name: Build and Push Docker Image
+      working-directory: starter/frontend/
       env:
         IMAGE_TAG: latest
+        REPO_NAME: frontend
       run: |
         cd starter/frontend
-        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG .
-        docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:$IMAGE_TAG
-    - name: Update kubeconfig
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 669172573612.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG .
+        docker push 669172573612.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+    
+
+    - name: Configure Kubeconfig
       run:
        aws eks update-kubeconfig --name udacity-project4 --region us-east-1
 
-    - name: Deploy Docker Image to Amazon EKS using kubectl
+
+    - name: Deploy Docker Image to Amazon EKS
       working-directory: starter/frontend/k8s
+      env:
+        IMAGE_TAG: latest
+        REPO_NAME: frontend
       run: |
-          kustomize edit set image frontend=669172573612.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+          kustomize edit set image frontend=669172573612.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG
           kustomize build | kubectl apply -f -

@@ -1,5 +1,10 @@
 # Movie Picture Pipeline
 
+| Continuous Integration  | Continuous Deployment|
+| --- |---|
+[![Backend Continuous Integration](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/backend-ci.yml)  | [![Frontend Continuous Deployment](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/frontend-cd.yml/badge.svg)](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/frontend-cd.yml) |
+[![Frontend Continuous Integration](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/frontend-ci.yml) | [![Backend Continuous Deployment](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/backend-cd.yml/badge.svg)](https://github.com/Amnahalkhalil/Movie-Picture-Pipeline/actions/workflows/backend-cd.yml) |
+
 You've been brought on as the DevOps resource for a development team that manages a web application that is a catalog of Movie Picture movies. They're in dire need of automating their development workflows in hopes of accelerating their release cycle. They'd like to use Github Actions to automate testing, building and deploying their applications to an existing Kubernetes cluster.
 
 The team's project is comprised of 2 applications.
@@ -469,4 +474,3 @@ kustomize build | kubectl apply -f -
 ## License
 
 [License](LICENSE.md)
-# Movie-Picture-Pipeline
